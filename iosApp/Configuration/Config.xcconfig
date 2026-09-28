@@ -1,0 +1,11 @@
+TEAM_ID=
+
+PRODUCT_NAME=DetectorLicensePlateOcr
+PRODUCT_BUNDLE_IDENTIFIER=botix.dev.detectorlicenseplateocr.DetectorLicensePlateOcr$(TEAM_ID)
+
+CURRENT_PROJECT_VERSION=1
+MARKETING_VERSION=1.0
+TFLITE_XCFRAMEWORK=$(SRCROOT)/Frameworks/TensorFlowLiteC.xcframework
+FRAMEWORK_SEARCH_PATHS[sdk=iphoneos*]=$(inherited) $(TFLITE_XCFRAMEWORK)/ios-arm64
+FRAMEWORK_SEARCH_PATHS[sdk=iphonesimulator*]=$(inherited) $(TFLITE_XCFRAMEWORK)/ios-arm64_x86_64-simulator
+OTHER_LDFLAGS=$(inherited) -framework TensorFlowLiteC -lc++

@@ -1,0 +1,3 @@
+language = C
+headers = c_api.h
+package = tensorflow.lite.c
