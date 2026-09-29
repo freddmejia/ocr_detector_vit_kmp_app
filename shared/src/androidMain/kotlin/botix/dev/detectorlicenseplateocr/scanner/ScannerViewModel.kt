@@ -139,38 +139,11 @@ class ScannerViewModel(application: Application) : AndroidViewModel(application)
     }
 
     private fun publish(result: PipelineResult, lens: CameraLens, totalMillis: Long) {
-        // The plate that went through the OCR if any, else the most confident one.
+        val reading = result.toScanReading(lens, totalMillis, sequence.incrementAndGet())
         val plate = result.plates.firstOrNull { it.text != null } ?: result.plates.firstOrNull()
-        val outcome = when {
-            plate == null -> ReadingOutcome.NO_PLATE
-            !plate.readable -> ReadingOutcome.TOO_SMALL
-            plate.text.isNullOrEmpty() -> ReadingOutcome.NO_TEXT
-            else -> ReadingOutcome.READ
-        }
-        val w = result.imageWidth.toFloat()
-        val h = result.imageHeight.toFloat()
-        val boxes = result.plates.map {
-            val rect = NormalizedRect(
-                (it.box.x0 / w).coerceIn(0f, 1f),
-                (it.box.y0 / h).coerceIn(0f, 1f),
-                (it.box.x1 / w).coerceIn(0f, 1f),
-                (it.box.y1 / h).coerceIn(0f, 1f),
-            )
-            // The front preview is mirrored; the analyzed frame is not.
-            if (lens == CameraLens.FRONT) rect.mirroredHorizontally() else rect
-        }
-        val reading = ScanReading(
-            outcome = outcome,
-            text = plate?.text,
-            detectionScore = plate?.detectionScore,
-            ocrConfidence = plate?.ocrConfidence,
-            plateBoxes = boxes,
-            totalMillis = totalMillis,
-            sequence = sequence.incrementAndGet(),
-        )
         Log.d(
             TAG,
-            "outcome=$outcome text=${plate?.text} raw=${plate?.rawText} det=${plate?.detectionScore} " +
+            "outcome=${reading.outcome} text=${plate?.text} raw=${plate?.rawText} det=${plate?.detectionScore} " +
                 "ocr=${plate?.ocrConfidence} roi=${result.imageWidth}x${result.imageHeight} " +
                 "crop=${plate?.cropWidth}x${plate?.cropHeight} detector=${result.detectorMillis}ms ocr=${result.ocrMillis}ms",
         )
@@ -178,21 +151,9 @@ class ScannerViewModel(application: Application) : AndroidViewModel(application)
             current.copy(
                 lastReading = reading,
                 error = null,
-                history = if (outcome == ReadingOutcome.READ) current.history.withHit(reading) else current.history,
+                history = if (reading.outcome == ReadingOutcome.READ) current.history.withHit(reading) else current.history,
             )
         }
-    }
-
-    private fun List<PlateHit>.withHit(reading: ScanReading): List<PlateHit> {
-        val text = reading.text ?: return this
-        val existing = firstOrNull { it.text == text }
-        val hit = PlateHit(
-            text = text,
-            bestOcrConfidence = maxOf(existing?.bestOcrConfidence ?: 0f, reading.ocrConfidence ?: 0f),
-            bestDetectionScore = maxOf(existing?.bestDetectionScore ?: 0f, reading.detectionScore ?: 0f),
-            count = (existing?.count ?: 0) + 1,
-        )
-        return (listOf(hit) + filter { it.text != text }).take(MAX_HISTORY)
     }
 
     override fun toggleScanning() {
@@ -236,6 +197,5 @@ class ScannerViewModel(application: Application) : AndroidViewModel(application)
 
     private companion object {
         const val TAG = "PlateScanner"
-        const val MAX_HISTORY = 8
     }
 }

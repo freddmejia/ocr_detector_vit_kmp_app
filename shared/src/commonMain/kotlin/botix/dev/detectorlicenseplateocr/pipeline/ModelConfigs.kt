@@ -20,6 +20,12 @@ object ModelFiles {
     /** fast-plate-ocr fine-tune, the default OCR (see [OcrEngine]). The TrOCR files above are for comparison tests. */
     const val FAST_OCR_MODEL = "ocr/plate_ocr.tflite"
     const val FAST_OCR_CONFIG = "ocr/plate_ocr_config.json"
+
+    /**
+     * [FAST_OCR_MODEL] with its int8 weights dequantized to float32, for iOS: TensorFlow Lite C 2.17 returns zeros
+     * from the hybrid FULLY_CONNECTED layers of the original. Built by `scripts/dequantize_hybrid_weights.py`.
+     */
+    const val FAST_OCR_MODEL_FLOAT = "ocr/plate_ocr_float.tflite"
 }
 
 /** Which OCR model reads the plate crops. */

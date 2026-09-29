@@ -1,4 +1,5 @@
 import org.jetbrains.kotlin.gradle.dsl.JvmTarget
+import org.jetbrains.kotlin.gradle.targets.native.tasks.KotlinNativeSimulatorTest
 
 plugins {
     alias(libs.plugins.kotlinMultiplatform)
@@ -126,4 +127,11 @@ kotlin {
 
 dependencies {
     androidRuntimeClasspath(libs.compose.uiTooling)
+}
+
+// The simulator test binary has no app bundle: hand it the model and reference-image folders instead. simctl forwards
+// variables prefixed with SIMCTL_CHILD_ into the simulated process, without the prefix.
+tasks.withType<KotlinNativeSimulatorTest>().configureEach {
+    environment("SIMCTL_CHILD_MODELS_DIR", project.file("src/androidMain/assets").absolutePath)
+    environment("SIMCTL_CHILD_REFERENCE_DIR", project.file("src/androidDeviceTest/assets/reference").absolutePath)
 }
