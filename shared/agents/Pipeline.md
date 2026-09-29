@@ -56,10 +56,12 @@ que ya sea el recorte de una placa).
 |---|---|---|---|---|
 | `rf_detr_license_plates.tflite` | `outputs/rf_detr_license_plates/` | 124 677 256 B (~125 MB) | Sí | Modelo detector |
 | `preprocessor_config.json` | `outputs/rf_detr_license_plates/final/` | 442 B | Recomendado | Preprocesado del detector (tamaño, media, desviación) |
-| `trocr_placas_int8.tflite` | `outputs/trocr_placas_rellenas_colombia/tflite/` | 394 347 488 B (~394 MB) | Sí | Modelo OCR (pesos int8) |
-| `config_tflite.json` | `outputs/trocr_placas_rellenas_colombia/tflite/` | 477 B | Sí | Preprocesado del OCR y tokens especiales |
-| `vocabulario.json` | `outputs/trocr_placas_rellenas_colombia/tflite/` | 964 188 B | Sí | Id de token → texto |
+| `trocr_placas_int8.tflite` | `outputs/trocr_placas_rellenas_colombia/tflite/` | 394 347 488 B (~394 MB) | No (solo tests) | OCR TrOCR (pesos int8): ya no va en la app; lo usan las pruebas de comparación en dispositivo |
+| `config_tflite.json` | `outputs/trocr_placas_rellenas_colombia/tflite/` | 477 B | Con TrOCR | Preprocesado de TrOCR y tokens especiales |
+| `vocabulario.json` | `outputs/trocr_placas_rellenas_colombia/tflite/` | 964 188 B | Con TrOCR | Id de token → texto |
 | `trocr_placas.tflite` | `outputs/trocr_placas_rellenas_colombia/tflite/` | 1 540 603 800 B (~1,5 GB) | **No** | OCR float32: solo para pruebas en escritorio; no debe ir en la app |
+| `plate_ocr.tflite` | fine-tuning de fast-plate-ocr | 1 597 848 B (~1,6 MB) | Sí | Modelo OCR de la app (`OcrEngine.FAST_PLATE_OCR`, el predeterminado): entrada NHWC `[1, 64, 128, 3]` float32 con píxeles RGB 0-255 (el `1/255` está dentro del modelo), salida `[1, 10, 37]` ya con softmax |
+| `plate_ocr_config.json` | escrito a mano con los valores del `plate_config.yaml` del fine-tuning | 201 B | Sí | Tamaño de entrada, número de posiciones, alfabeto y carácter de relleno |
 
 SHA-256 de los ficheros exportados a fecha de esta guía (para verificar descargas y empaquetado):
 
@@ -69,6 +71,7 @@ f4c2675905e42082630ec7b657ac99881741b0c2d4a9b6aabbc61fe26a6d30ab  rf_detr_licens
 da7499dbdc1855c8bdf48547cfc79912db9cd7db592dae9dfca52aa62403bc6e  trocr_placas_int8.tflite
 868f79f992a3f1591ecad72550826bf2660d2417bd266e11ef34da1ecacef60e  config_tflite.json
 e587ea3e69db8e5d3f2155dea57e50a64d58b146f358c9a06dc19f160fbd272d  vocabulario.json
+ac6a129b8f2a5ba379f8b126c96fcd7c69428fdb8c2194101404a324eed72aaf  plate_ocr.tflite
 ```
 
 Si se reentrena o se vuelve a exportar un modelo, estos valores cambian: hay que actualizar la tabla (ver sección 12).

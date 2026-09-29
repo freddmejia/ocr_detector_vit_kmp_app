@@ -30,6 +30,17 @@ android {
         versionCode = 1
         versionName = "1.0"
     }
+    androidResources {
+        // Models are memory-mapped straight from the APK, which needs them stored uncompressed.
+        noCompress += "tflite"
+        // The app reads plates with plate_ocr.tflite (OcrEngine.FAST_PLATE_OCR), so the TrOCR files stay out of the
+        // APK: they are only used by the device tests that compare both OCRs (Pipeline.md 2.1).
+        // The other entries are aapt's defaults, which a custom pattern would otherwise replace.
+        ignoreAssetsPatterns += listOf(
+            "!trocr_placas.tflite", "!trocr_placas_int8.tflite", "!config_tflite.json", "!vocabulario.json", "!.svn", "!.git", "!.ds_store", "!*.scc", ".*", "<dir>_*",
+            "!CVS", "!thumbs.db", "!picasa.ini", "!*~",
+        )
+    }
     packaging {
         resources {
             excludes += "/META-INF/{AL2.0,LGPL2.1}"

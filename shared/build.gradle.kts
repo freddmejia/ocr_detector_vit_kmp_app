@@ -73,6 +73,13 @@ kotlin {
        }
        androidResources {
            enable = true
+           // Same rules as androidApp, for the device-test APK: models stored uncompressed (memory-mapped) and
+           // without the 1.5 GB float32 OCR, which is for desktop tests only (Pipeline.md 2.1).
+           noCompress += "tflite"
+           ignoreAssetsPatterns += listOf(
+               "!trocr_placas.tflite", "!.svn", "!.git", "!.ds_store", "!*.scc", ".*", "<dir>_*",
+               "!CVS", "!thumbs.db", "!picasa.ini", "!*~",
+           )
        }
        withHostTest {
            isIncludeAndroidResources = true
@@ -88,6 +95,7 @@ kotlin {
         androidMain.dependencies {
             implementation(libs.compose.uiToolingPreview)
             implementation(libs.compose.uiTooling)
+            implementation(libs.androidx.activity.compose)
             api(libs.litert)
             implementation(libs.androidx.camera.core)
             implementation(libs.androidx.camera.camera2)
@@ -103,9 +111,15 @@ kotlin {
             implementation(libs.compose.uiToolingPreview)
             implementation(libs.androidx.lifecycle.viewmodelCompose)
             implementation(libs.androidx.lifecycle.runtimeCompose)
+            implementation(libs.kotlinx.coroutines.core)
+            implementation(libs.kotlinx.serialization.json)
         }
         commonTest.dependencies {
             implementation(libs.kotlin.test)
+        }
+        getByName("androidDeviceTest").dependencies {
+            implementation(libs.androidx.testRunner)
+            implementation(libs.androidx.testExt.junit)
         }
     }
 }

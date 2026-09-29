@@ -1,0 +1,28 @@
+{
+  "entrada": {
+    "alto": 128,
+    "ancho": 128,
+    "formato": "NCHW float32 RGB",
+    "reescalado": 0.00392156862745098,
+    "media": [
+      0.5,
+      0.5,
+      0.5
+    ],
+    "desviacion": [
+      0.5,
+      0.5,
+      0.5
+    ]
+  },
+  "tokens": {
+    "start": 0,
+    "pad": 1,
+    "eos": 2,
+    "max_length": 16
+  },
+  "firmas": {
+    "encoder": "args_0=pixel_values -> estados",
+    "decoder": "args_0=input_ids int32 [1, max_length], args_1=estados -> logits"
+  }
+}

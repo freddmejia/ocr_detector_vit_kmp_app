@@ -1,0 +1,9 @@
+{
+  "max_plate_slots": 10,
+  "alphabet": "0123456789ABCDEFGHIJKLMNOPQRSTUVWXYZ_",
+  "pad_char": "_",
+  "img_height": 64,
+  "img_width": 128,
+  "image_color_mode": "rgb",
+  "keep_aspect_ratio": false
+}
