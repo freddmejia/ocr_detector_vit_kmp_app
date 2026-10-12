@@ -298,3 +298,35 @@ Both scripts need `pip install ai-edge-litert numpy flatbuffers` (only the schem
 2. Update `ModelAssetsTest` (384 px, current SHA-256 values) and the Android device tests, which still load the TrOCR files that are no longer in assets.
 3. Ask the ML side to export without buffer offsets and, if iOS must match Android bit for bit, to check a TFLite 2.17-compatible OCR export; otherwise keep the two scripts in the model-update routine.
 4. Longer term: LiteRT's C API on iOS would run the original files directly (Baseline section 8 lists why it was not the baseline).
+
+---
+
+# Part 4: retrained fast-plate-ocr and 2:1 plate crop on iOS
+
+- Date: 2026-10-12
+- Source of truth: `IosPort.md`, `Pipeline.md` (2.1, 4.5 step 0) and `Baseline.md`.
+- Context: Android already uses the retrained `cct_xs` model, its `plate_config.yaml` and `PipelineParams.cropAspectRatio = 2.0`, all in `commonMain`. `IosPort.md` was written before the Part 3 iOS code was merged, so tasks 1, 3 and 5 (runtime, factory, camera) already existed; this part only brings iOS in line with the new model.
+
+## 16. Changes
+
+| File | Change | Why |
+|---|---|---|
+| `shared/src/androidMain/assets/ocr/plate_ocr_float.tflite` | Regenerated from the new `plate_ocr.tflite` with `scripts/dequantize_hybrid_weights.py` (47 weight tensors, 3 021 936 B) | The previous file was the float copy of the **old** `cct_s` model |
+| `iosMain/.../pipeline/IosTfliteModel.kt` | `createPlateTextReader` loads `ModelFiles.FAST_OCR_MODEL_FLOAT` again | Commit `7fb8fb0` switched iOS to `plate_ocr.tflite`. Verified on the simulator: with the new hybrid model every plate reads `''` with the same confidence (0.997), the same TFLite C 2.17 bug as in section 13 |
+| `iosApp.xcodeproj` (`Copy Model Files`) | Copies `ocr/plate_config.yaml` instead of the deleted `ocr/plate_ocr_config.json` | With `set -eu` the phase would fail the build |
+| `iosTest/.../pipeline/IosFastPlateOcrTest.kt` | New: `IosPort.md` task 4 checks (YAML 64/128/10/37 chars, 1 signature `[1, 64, 128, 3]` -> `[1, 10, 37]`, `FastPlateOcr` on any image: confidence in 0..1 and 10 slots, app pipeline created) | Done criteria of `IosPort.md` |
+| `Pipeline.md` | 2.1: `plate_ocr_float.tflite` row, its SHA-256 and the 4 files of the iOS copy phase; 13: regenerate the float copy when the OCR changes | |
+
+Deviation from `IosPort.md` task 2: it lists `ocr/plate_ocr.tflite`; iOS copies and loads `ocr/plate_ocr_float.tflite` because the original returns zeros on TFLite C 2.17. The bundle keeps the folder layout as `models/detector/...` and `models/ocr/...` (Part 3), read with `createLicensePlatePipeline(modelsDir)`.
+
+The iOS scanner (`IosScannerViewModel`) builds the pipeline with the default `PipelineParams()`, so the 2:1 crop applies without iOS code.
+
+## 17. Verification
+
+| Check | Result |
+|---|---|
+| `./gradlew :shared:iosSimulatorArm64Test` | **44/44 passed**, including `FastPlateOcrTest`, `PostprocessingTest` and the new `IosFastPlateOcrTest`. `IosReferencePipelineTest` reads `NZQ7G26`, `CVL65718`, `LJ733PS`, `GRF4721` exactly (OCR confidence >= 0.999); crops are now ~2:1 (e.g. 152x86). Detector ~0.7 s, OCR ~6 ms on the simulator |
+| `xcodebuild` (iOS simulator) | **Build succeeded.** `<app>/models/` contains exactly the 4 files |
+| App on the iPhone 18 Pro simulator (iOS 27) | Launches and loads the models ("Ready to scan"); "No camera available" as expected |
+| `:shared:testAndroidHostTest` | 35/37. Same 2 pre-existing `ModelAssetsTest` failures (576 px detector, old detector SHA-256), unrelated to this part |
+| Live camera on a physical iPhone | **Not verified** (no device) |

@@ -62,6 +62,7 @@ que ya sea el recorte de una placa).
 | `trocr_placas.tflite` | `outputs/trocr_placas_rellenas_colombia/tflite/` | 1 540 603 800 B (~1,5 GB) | **No** | OCR float32: solo para pruebas en escritorio; no debe ir en la app |
 | `plate_ocr.tflite` | `outputs/fast_plate_ocr/export/` (`FastPlateOCR_Placas.ipynb`, `cct_xs`) | 938 944 B (~0,9 MB) | Sí | Modelo OCR de la app (`OcrEngine.FAST_PLATE_OCR`, el predeterminado): entrada NHWC `[1, 64, 128, 3]` float32 con píxeles RGB 0-255 (el `1/255` está dentro del modelo), salida `plate` `[1, 10, 37]` ya con softmax |
 | `plate_config.yaml` | `outputs/fast_plate_ocr/export/` (misma exportación que `plate_ocr.tflite`) | 1 725 B | Sí | Tamaño de entrada, número de posiciones (`max_plate_slots`), alfabeto y carácter de relleno. Sustituye al `vocabulario.json` de TrOCR: el carácter de la posición `i` es `alphabet[argmax(salida[i])]` |
+| `plate_ocr_float.tflite` | generado en la app KMP: `scripts/dequantize_hybrid_weights.py plate_ocr.tflite plate_ocr_float.tflite` | 3 021 936 B (~3,0 MB) | Sí, **solo iOS** | `plate_ocr.tflite` con los pesos int8 pasados a float32. TensorFlow Lite C 2.17 (iOS) devuelve ceros en las capas híbridas del original y todas las placas salen vacías. Mismas entradas, salidas y `plate_config.yaml`. Android usa `plate_ocr.tflite` y excluye esta copia del APK. Regenerarlo cada vez que cambie `plate_ocr.tflite` |
 
 SHA-256 de los ficheros exportados a fecha de esta guía (para verificar descargas y empaquetado):
 
@@ -73,7 +74,12 @@ da7499dbdc1855c8bdf48547cfc79912db9cd7db592dae9dfca52aa62403bc6e  trocr_placas_i
 e587ea3e69db8e5d3f2155dea57e50a64d58b146f358c9a06dc19f160fbd272d  vocabulario.json
 6f4673eda971373a0e65a26fce951d9cd94c2ce4b3d7647551a61022cee53f34  plate_ocr.tflite
 0335c74a305173bb6f393efed0fde03cadeaa0b649ed8e19f431016d8232d0a6  plate_config.yaml
+1c1a66ed421e43b9669859b973006580ee1750fdd01cf7205a58ea762b9861e1  plate_ocr_float.tflite
 ```
+
+En iOS, la fase *Copy Model Files* de `iosApp.xcodeproj` copia de `shared/src/androidMain/assets` a `<bundle>/models/`
+solo estos cuatro ficheros: `detector/rf_detr_license_plates_fp16.tflite`, `detector/preprocessor_config.json`,
+`ocr/plate_ocr_float.tflite` y `ocr/plate_config.yaml`.
 
 Si se reentrena o se vuelve a exportar un modelo, estos valores cambian: hay que actualizar la tabla (ver sección 12).
 
@@ -552,5 +558,8 @@ Si se reentrena o se reexporta:
 * **OCR** (`TrOCR_Placas.ipynb`, última celda, o `scripts/exportar_ocr_tflite.py`): sustituir juntos
   `trocr_placas_int8.tflite`, `config_tflite.json` y `vocabulario.json`, que salen de la misma carpeta
   `outputs/<modelo>/tflite/`. El tamaño de entrada puede cambiar.
+* **OCR fast-plate-ocr** (`FastPlateOCR_Placas.ipynb`): sustituir juntos `plate_ocr.tflite` y `plate_config.yaml` de
+  `outputs/fast_plate_ocr/export/` y regenerar `plate_ocr_float.tflite` para iOS con
+  `scripts/dequantize_hybrid_weights.py`.
 * En ambos casos, actualizar los SHA-256 de la sección 2.1 y la tabla de la sección 10.4 (regenerándola con
   `Pipeline_TFLite.ipynb`), y volver a pasar todas las pruebas.
