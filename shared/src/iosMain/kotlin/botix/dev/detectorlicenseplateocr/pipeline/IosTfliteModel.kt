@@ -236,7 +236,7 @@ fun createPlateTextReader(
     OcrEngine.FAST_PLATE_OCR -> {
         val config = FastOcrConfig.parse(readText("$modelsDir/${ModelFiles.FAST_OCR_CONFIG}"))
         // The float32 copy: TFLite C 2.17 cannot run the hybrid layers of plate_ocr.tflite (see ModelFiles).
-        val model = IosTfliteModel.fromFile("$modelsDir/${ModelFiles.FAST_OCR_MODEL_FLOAT}", threads)
+        val model = IosTfliteModel.fromFile("$modelsDir/${ModelFiles.FAST_OCR_MODEL}", threads)
         try {
             FastPlateOcr(model, config)
         } catch (e: Throwable) {
