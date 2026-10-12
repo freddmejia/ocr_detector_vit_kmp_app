@@ -242,3 +242,59 @@ Status of these items after Part 2: 1 resolved on Android (the classic `Interpre
 3. Model delivery: a 565 MB APK is fine for development; Play needs download-on-first-use or Play Asset Delivery (Pipeline.md 2.3).
 4. ABI split / `abiFilters` (Baseline 3.5).
 5. iOS implementation.
+
+---
+
+# Part 3: iOS implementation
+
+- Date: 2026-09-29
+- Source of truth: `Pipeline.md`, `Baseline.md` section 4, and the Android implementation (Part 2), which iOS mirrors.
+- Scope: the same live scanner as Android. The pipeline (`commonMain`) and the UI (`ScannerScreen`) are shared unchanged; iOS adds the runtime, the camera and the Xcode wiring.
+
+## 12. What was built
+
+| File | Content |
+|---|---|
+| `iosMain/.../pipeline/IosTfliteModel.kt` | `TfliteModel` on TensorFlow Lite C 2.17 **signature runners** (`TfLiteInterpreterGetSignatureRunner`, resolves open item 1 for iOS). One runner per signature, allocated once; inputs/outputs copied straight between the caller's arrays and the tensors, with type and byte-size checks. `createLicensePlatePipeline(modelsDir)` / `createPlateTextReader` as on Android. 2 threads (2 performance cores) |
+| `iosMain/.../scanner/IosCamera.kt` | AVFoundation: `AVCaptureSession` 1920x1080, `AVCaptureVideoDataOutput` `32BGRA` with `alwaysDiscardsLateVideoFrames` (= KEEP_ONLY_LATEST), frames on the analysis queue. Back camera prefers the virtual multi-lens devices; zoom shown in user ratios via `displayVideoZoomFactorMultiplier` (starts at 1x, capped at 10x). Torch, lens switch, pinch-to-zoom, tap-to-focus. `AVCaptureDeviceRotationCoordinator` gives the preview angle, used for the preview layer **and** the frame crop |
+| `iosMain/.../scanner/IosFrameCropper.kt` | View -> upright frame (aspect fill) -> buffer; copies the guide at full resolution rotating exactly once, BGRA -> RGB |
+| `iosMain/.../scanner/IosScannerViewModel.kt` | Same behavior as Android's `ScannerViewModel`: model loading and inference on one serial queue, results, history |
+| `iosMain/.../ScannerRoute.ios.kt` | Camera permission (ask, Settings after a denial), preview in `UIKitView`, camera started/stopped with the lifecycle, idle timer off while scanning |
+| `commonMain/.../scanner/ScanReadings.kt` | `PipelineResult.toScanReading` and `withHit`, moved out of the Android view model so both platforms share them (Android behavior unchanged) |
+| `iosApp.xcodeproj` | `Copy Model Files` build phase after the Kotlin framework: copies the 4 files iOS loads from `androidMain/assets` into `<bundle>/models/` (`rsync`, one source for both platforms) |
+| `shared/build.gradle.kts` | `SIMCTL_CHILD_MODELS_DIR` / `SIMCTL_CHILD_REFERENCE_DIR` for the simulator tests (Baseline 4.4) |
+
+## 13. Model files: two runtime incompatibilities of TensorFlow Lite C 2.17
+
+| Problem | Symptom on iOS | Fix |
+|---|---|---|
+| Both RF-DETR detectors store their weights **after** the flatbuffer (`Buffer.offset`/`size`, written by recent converters). LiteRT reads that; TFLite C 2.17 does not | `Input tensor 336 lacks data` on the first invoke | `scripts/inline_tflite_buffers.py --verify` rewrote both detector files in place with the weights inside the flatbuffer, 16-byte aligned. Verified: same graph and same bytes in all 393 buffers. Android loads the same files |
+| `plate_ocr.tflite` is dynamic-range quantized; its hybrid `FULLY_CONNECTED` (int8 per-channel weights, `asymmetric_quantize_inputs`, dynamic input shape) returns **all zeros** on TFLite C 2.17 | Every plate reads as empty (all pad slots, same confidence for any input). Found by exposing intermediate tensors: the convolutions follow the input, FC #27 is zero | `scripts/dequantize_hybrid_weights.py` -> `ocr/plate_ocr_float.tflite` (4.8 MB, weights `(q - zp) * scale`). iOS loads it (`ModelFiles.FAST_OCR_MODEL_FLOAT`); Android keeps `plate_ocr.tflite` and excludes the float copy from the APK |
+
+New SHA-256 values:
+
+```
+6e37f79a64734c62e1f779a284262eb1076d214c5aef696a264f996e510e18bf  detector/rf_detr_license_plates_fp16.tflite (inlined)
+02fe323d254689ab5b6de233a724ba9683af5e7320f358a6b381dffdd06a2fcd  detector/rf_detr_license_plates_int8.tflite (inlined)
+7bffc2dcfe5edf5c5b9a25d6b79be69ddd98c2074bef81e1a584332bd15cd1a7  ocr/plate_ocr_float.tflite
+```
+
+Both scripts need `pip install ai-edge-litert numpy flatbuffers` (only the schema module is used). Re-run them whenever the ML project re-exports a model, or better, export without buffer offsets from the ML side.
+
+## 14. Verification
+
+| Check | Result |
+|---|---|
+| `./gradlew :shared:iosSimulatorArm64Test` | **35/35 passed.** The 27 common tests (normalization, Pillow-exact resize, detector postprocessing, OCR) now also run on iOS; `IosFrameCropperTest` pins the rotation direction and the aspect-fill mapping; `IosReferencePipelineTest` reads the 4 visible plates exactly as Android's ground truth: `NZQ7G26`, `CVL65718`, `LJ733PS`, `GRF4721`. Simulator (Mac CPU): detector ~0.49 s, OCR ~20 ms |
+| `xcodebuild` simulator and `generic/platform=iOS` | **Build succeeded** for both (device build without signing) |
+| App on the iPhone 17 Pro simulator | Launches, loads the models in 43 ms, shows the shared scanner UI. The simulator has no camera, so it shows "No camera available" |
+| `:androidApp:assembleDebug`, `:shared:compileAndroidDeviceTest` | Passed. APK contains the (inlined) detectors and `plate_ocr.tflite`, not `plate_ocr_float.tflite` |
+| `:shared:testAndroidHostTest` | 30/32. The 2 failures predate this part: `ModelAssetsTest` still expects the 576 px detector and its old SHA-256, while the committed detector is 384 px |
+| Live camera on a physical iPhone | **Not verified** (no device here): camera, rotation, zoom, torch and real-time readings need a real iPhone |
+
+## 15. Open items
+
+1. Run the app on a physical iPhone: signing (`TEAM_ID` in `Config.xcconfig`), then check framing of the guide crop in portrait and landscape, speed and memory.
+2. Update `ModelAssetsTest` (384 px, current SHA-256 values) and the Android device tests, which still load the TrOCR files that are no longer in assets.
+3. Ask the ML side to export without buffer offsets and, if iOS must match Android bit for bit, to check a TFLite 2.17-compatible OCR export; otherwise keep the two scripts in the model-update routine.
+4. Longer term: LiteRT's C API on iOS would run the original files directly (Baseline section 8 lists why it was not the baseline).
