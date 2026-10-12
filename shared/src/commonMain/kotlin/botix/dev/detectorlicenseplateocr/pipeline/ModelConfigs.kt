@@ -2,7 +2,6 @@ package botix.dev.detectorlicenseplateocr.pipeline
 
 import kotlinx.serialization.json.Json
 import kotlinx.serialization.json.JsonObject
-import kotlinx.serialization.json.boolean
 import kotlinx.serialization.json.float
 import kotlinx.serialization.json.int
 import kotlinx.serialization.json.jsonArray
@@ -19,7 +18,7 @@ object ModelFiles {
 
     /** fast-plate-ocr fine-tune, the default OCR (see [OcrEngine]). The TrOCR files above are for comparison tests. */
     const val FAST_OCR_MODEL = "ocr/plate_ocr.tflite"
-    const val FAST_OCR_CONFIG = "ocr/plate_ocr_config.json"
+    const val FAST_OCR_CONFIG = "ocr/plate_config.yaml"
 }
 
 /** Which OCR model reads the plate crops. */
@@ -79,8 +78,8 @@ class OcrConfig(val height: Int, val width: Int, val normalization: Normalizatio
 }
 
 /**
- * fast-plate-ocr settings, read from `plate_ocr_config.json`: the fields of the `plate_config.yaml` used to train the
- * model. Output slot `i` holds a probability per [alphabet] character; [padChar] fills the slots after the plate.
+ * fast-plate-ocr settings, read from the `plate_config.yaml` exported with the model (FastPlateOCR_Placas.ipynb).
+ * Output slot `i` holds a probability per [alphabet] character; [padChar] fills the slots after the plate.
  */
 class FastOcrConfig(val height: Int, val width: Int, val slots: Int, val alphabet: String, val padChar: Char) {
     init {
@@ -88,21 +87,51 @@ class FastOcrConfig(val height: Int, val width: Int, val slots: Int, val alphabe
     }
 
     companion object {
-        fun parse(json: String): FastOcrConfig {
-            val root = Json.parseToJsonElement(json).jsonObject
-            val colorMode = root.getString("image_color_mode")
+        fun parse(yaml: String): FastOcrConfig {
+            val fields = parseYamlScalars(yaml)
+            fun field(name: String) = fields[name] ?: throw IllegalArgumentException("Missing field '$name'")
+            fun int(name: String) = field(name).toIntOrNull()
+                ?: throw IllegalArgumentException("'$name' is not an integer: '${field(name)}'")
+
+            val colorMode = field("image_color_mode")
             require(colorMode == "rgb") { "image_color_mode '$colorMode' is not supported, only 'rgb'" }
-            require(!root.getBoolean("keep_aspect_ratio")) { "keep_aspect_ratio: true is not supported" }
-            val padChar = root.getString("pad_char")
+            require(field("keep_aspect_ratio").lowercase() == "false") { "keep_aspect_ratio: true is not supported" }
+            // FastPlateOcr resizes bilinearly ([resizeBilinear]).
+            val interpolation = field("interpolation")
+            require(interpolation == "linear") { "interpolation '$interpolation' is not supported, only 'linear'" }
+            val padChar = field("pad_char")
             require(padChar.length == 1) { "pad_char must be one character, got '$padChar'" }
             return FastOcrConfig(
-                height = root.getInt("img_height"),
-                width = root.getInt("img_width"),
-                slots = root.getInt("max_plate_slots"),
-                alphabet = root.getString("alphabet"),
+                height = int("img_height"),
+                width = int("img_width"),
+                slots = int("max_plate_slots"),
+                alphabet = field("alphabet"),
                 padChar = padChar[0],
             )
         }
+    }
+}
+
+/**
+ * Top-level `key: value` scalars of a YAML file, enough for fast-plate-ocr's flat `plate_config.yaml`. Comments, blank
+ * lines and indented lines (the continuation of the multi-line `plate_regions` list) are skipped; the quotes around a
+ * value are removed. Not a general YAML parser.
+ */
+internal fun parseYamlScalars(yaml: String): Map<String, String> = buildMap {
+    for (line in yaml.lineSequence()) {
+        if (line.isBlank() || line[0].isWhitespace() || line.startsWith("#")) continue
+        val colon = line.indexOf(':')
+        if (colon < 0) continue
+        val key = line.substring(0, colon).trim()
+        val value = line.substring(colon + 1).trim()
+        val quote = value.firstOrNull()
+        put(key, if (quote == '\'' || quote == '"') {
+            val end = value.indexOf(quote, 1)
+            require(end > 0) { "Unterminated quote in '$key'" }
+            value.substring(1, end)
+        } else {
+            value.substringBefore(" #").trim()
+        })
     }
 }
 
@@ -138,6 +167,4 @@ private fun JsonObject.field(name: String) = this[name] ?: throw IllegalArgument
 private fun JsonObject.getObject(name: String) = field(name).jsonObject
 private fun JsonObject.getInt(name: String) = field(name).jsonPrimitive.int
 private fun JsonObject.getFloat(name: String) = field(name).jsonPrimitive.float
-private fun JsonObject.getString(name: String) = field(name).jsonPrimitive.content
-private fun JsonObject.getBoolean(name: String) = field(name).jsonPrimitive.boolean
 private fun JsonObject.getFloats(name: String) = field(name).jsonArray.map { it.jsonPrimitive.float }.toFloatArray()

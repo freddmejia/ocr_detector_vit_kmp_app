@@ -8,6 +8,13 @@ data class PipelineParams(
     val cropPaddingX: Double = 0.08,
     val cropPaddingY: Double = 0.15,
     val minOcrWidth: Int = 60,
+    /**
+     * Width / height the detector box is grown to (around its center) before adding the padding, so a box that
+     * leaves out the characters at the sides of the plate still covers the whole plate. 2.0 is the fast-plate-ocr
+     * input (128x64) and close to the median of its Colombian training crops (1.94, a 33x17 cm plate). Boxes are only
+     * grown, never shrunk. null keeps the detector box as is, like the Python reference (Pipeline.md 4.5).
+     */
+    val cropAspectRatio: Double? = 2.0,
 )
 
 data class PlateReading(

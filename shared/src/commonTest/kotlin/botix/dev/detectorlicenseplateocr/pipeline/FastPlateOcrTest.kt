@@ -6,28 +6,58 @@ import kotlin.test.assertEquals
 import kotlin.test.assertFailsWith
 
 class FastPlateOcrTest {
-    private val configJson = """
-        {"max_plate_slots": 4, "alphabet": "0123456789ABCDEFGHIJKLMNOPQRSTUVWXYZ_", "pad_char": "_",
-         "img_height": 2, "img_width": 3, "image_color_mode": "rgb", "keep_aspect_ratio": false}
+    /** Same layout as fast-plate-ocr's `plate_config.yaml`, with a tiny input and 4 slots. */
+    private val configYaml = """
+        # Config for Latin-alphabet plates
+
+        # Max number of plate slots supported.
+        max_plate_slots: 4
+        alphabet: '0123456789ABCDEFGHIJKLMNOPQRSTUVWXYZ_'
+        pad_char: '_'
+        img_height: 2
+        img_width: 3
+        keep_aspect_ratio: false
+        interpolation: linear
+        image_color_mode: rgb
+        plate_regions: [ 'Albania', 'Andorra',
+                         'Argentina', 'Unknown' ]
     """.trimIndent()
-    private val config = FastOcrConfig.parse(configJson)
+    private val config = FastOcrConfig.parse(configYaml)
 
     @Test
     fun parsesConfig() {
         assertEquals(2, config.height)
         assertEquals(3, config.width)
         assertEquals(4, config.slots)
+        assertEquals("0123456789ABCDEFGHIJKLMNOPQRSTUVWXYZ_", config.alphabet)
         assertEquals(36, config.alphabet.indexOf(config.padChar))
+    }
+
+    @Test
+    fun yamlScalarsSkipCommentsAndContinuationLines() {
+        val fields = parseYamlScalars(configYaml)
+        assertEquals("_", fields["pad_char"])
+        assertEquals("[ 'Albania', 'Andorra',", fields["plate_regions"])
+        assertEquals(null, fields["'Argentina', 'Unknown' ]"])
+        assertEquals("4", parseYamlScalars("max_plate_slots: 4  # heads")["max_plate_slots"])
     }
 
     @Test
     fun rejectsUnsupportedPreprocessing() {
         assertFailsWith<IllegalArgumentException> {
-            FastOcrConfig.parse(configJson.replace("\"rgb\"", "\"grayscale\""))
+            FastOcrConfig.parse(configYaml.replace("image_color_mode: rgb", "image_color_mode: grayscale"))
         }
         assertFailsWith<IllegalArgumentException> {
-            FastOcrConfig.parse(configJson.replace("\"keep_aspect_ratio\": false", "\"keep_aspect_ratio\": true"))
+            FastOcrConfig.parse(configYaml.replace("keep_aspect_ratio: false", "keep_aspect_ratio: true"))
         }
+        assertFailsWith<IllegalArgumentException> {
+            FastOcrConfig.parse(configYaml.replace("interpolation: linear", "interpolation: area"))
+        }
+    }
+
+    @Test
+    fun rejectsMissingField() {
+        assertFailsWith<IllegalArgumentException> { FastOcrConfig.parse(configYaml.replace("pad_char: '_'", "")) }
     }
 
     @Test
@@ -57,7 +87,7 @@ class FastPlateOcrTest {
     @Test
     fun rejectsConfigFromAnotherModel() {
         val model = FakeFastOcrModel(config, List(4) { '_' })
-        val wrongSlots = FastOcrConfig.parse(configJson.replace("\"max_plate_slots\": 4", "\"max_plate_slots\": 9"))
+        val wrongSlots = FastOcrConfig.parse(configYaml.replace("max_plate_slots: 4", "max_plate_slots: 9"))
         assertFailsWith<IllegalArgumentException> { FastPlateOcr(model, wrongSlots) }
     }
 }

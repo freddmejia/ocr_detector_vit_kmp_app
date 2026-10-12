@@ -68,7 +68,7 @@ class ReferencePipelineTest {
         val assets = InstrumentationRegistry.getInstrumentation().context.assets
         val image = assets.open("reference/images (1).jpeg").use { BitmapFactory.decodeStream(it) }.toRgb()
         val plate = pipeline.run(image).plates.first()
-        val crop = image.crop(plateCropRect(plate.box, image.width, image.height, PipelineParams()))
+        val crop = image.crop(plateCropRect(plate.box, image.width, image.height, REFERENCE_PARAMS))
         val result = pipeline.readPlate(crop)
         assertEquals("CUL718", result.text)
         assertTrue(result.confidence in 0f..1f)
@@ -97,6 +97,9 @@ class ReferencePipelineTest {
 
     companion object {
         private const val TAG = "ReferencePipelineTest"
+
+        /** The Python reference crops the detector box as is: no growing to the plate aspect ratio. */
+        private val REFERENCE_PARAMS = PipelineParams(cropAspectRatio = null)
         private lateinit var pipeline: LicensePlatePipeline
 
         @JvmStatic
@@ -104,6 +107,7 @@ class ReferencePipelineTest {
         fun load() {
             pipeline = createLicensePlatePipeline(
                 InstrumentationRegistry.getInstrumentation().context.assets,
+                params = REFERENCE_PARAMS,
                 ocrEngine = OcrEngine.TROCR,
             )
         }

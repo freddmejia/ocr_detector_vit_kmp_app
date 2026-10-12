@@ -81,14 +81,29 @@ internal fun decodeDetections(
 }
 
 /**
- * Crop with margin around a plate, clamped to the image (Pipeline.md 4.5). Computed in double precision with
- * truncation on the top-left, like the reference `int(x0 - pad_x)`.
+ * Crop with margin around a plate, clamped to the image (Pipeline.md 4.5). The box is first grown to
+ * [PipelineParams.cropAspectRatio], if set. Computed in double precision with truncation on the top-left, like the
+ * reference `int(x0 - pad_x)`.
  */
 internal fun plateCropRect(box: Box, imageWidth: Int, imageHeight: Int, params: PipelineParams): PixelRect {
-    val x0 = box.x0.toDouble()
-    val y0 = box.y0.toDouble()
-    val x1 = box.x1.toDouble()
-    val y1 = box.y1.toDouble()
+    var x0 = box.x0.toDouble()
+    var y0 = box.y0.toDouble()
+    var x1 = box.x1.toDouble()
+    var y1 = box.y1.toDouble()
+    val ratio = params.cropAspectRatio
+    val boxWidth = x1 - x0
+    val boxHeight = y1 - y0
+    if (ratio != null && boxWidth > 0 && boxHeight > 0) {
+        if (boxWidth < boxHeight * ratio) {
+            val grow = (boxHeight * ratio - boxWidth) / 2
+            x0 -= grow
+            x1 += grow
+        } else {
+            val grow = (boxWidth / ratio - boxHeight) / 2
+            y0 -= grow
+            y1 += grow
+        }
+    }
     val padX = (x1 - x0) * params.cropPaddingX
     val padY = (y1 - y0) * params.cropPaddingY
     return PixelRect(

@@ -60,8 +60,8 @@ que ya sea el recorte de una placa).
 | `config_tflite.json` | `outputs/trocr_placas_rellenas_colombia/tflite/` | 477 B | Con TrOCR | Preprocesado de TrOCR y tokens especiales |
 | `vocabulario.json` | `outputs/trocr_placas_rellenas_colombia/tflite/` | 964 188 B | Con TrOCR | Id de token → texto |
 | `trocr_placas.tflite` | `outputs/trocr_placas_rellenas_colombia/tflite/` | 1 540 603 800 B (~1,5 GB) | **No** | OCR float32: solo para pruebas en escritorio; no debe ir en la app |
-| `plate_ocr.tflite` | fine-tuning de fast-plate-ocr | 1 597 848 B (~1,6 MB) | Sí | Modelo OCR de la app (`OcrEngine.FAST_PLATE_OCR`, el predeterminado): entrada NHWC `[1, 64, 128, 3]` float32 con píxeles RGB 0-255 (el `1/255` está dentro del modelo), salida `[1, 10, 37]` ya con softmax |
-| `plate_ocr_config.json` | escrito a mano con los valores del `plate_config.yaml` del fine-tuning | 201 B | Sí | Tamaño de entrada, número de posiciones, alfabeto y carácter de relleno |
+| `plate_ocr.tflite` | `outputs/fast_plate_ocr/export/` (`FastPlateOCR_Placas.ipynb`, `cct_xs`) | 938 944 B (~0,9 MB) | Sí | Modelo OCR de la app (`OcrEngine.FAST_PLATE_OCR`, el predeterminado): entrada NHWC `[1, 64, 128, 3]` float32 con píxeles RGB 0-255 (el `1/255` está dentro del modelo), salida `plate` `[1, 10, 37]` ya con softmax |
+| `plate_config.yaml` | `outputs/fast_plate_ocr/export/` (misma exportación que `plate_ocr.tflite`) | 1 725 B | Sí | Tamaño de entrada, número de posiciones (`max_plate_slots`), alfabeto y carácter de relleno. Sustituye al `vocabulario.json` de TrOCR: el carácter de la posición `i` es `alphabet[argmax(salida[i])]` |
 
 SHA-256 de los ficheros exportados a fecha de esta guía (para verificar descargas y empaquetado):
 
@@ -71,7 +71,8 @@ f4c2675905e42082630ec7b657ac99881741b0c2d4a9b6aabbc61fe26a6d30ab  rf_detr_licens
 da7499dbdc1855c8bdf48547cfc79912db9cd7db592dae9dfca52aa62403bc6e  trocr_placas_int8.tflite
 868f79f992a3f1591ecad72550826bf2660d2417bd266e11ef34da1ecacef60e  config_tflite.json
 e587ea3e69db8e5d3f2155dea57e50a64d58b146f358c9a06dc19f160fbd272d  vocabulario.json
-ac6a129b8f2a5ba379f8b126c96fcd7c69428fdb8c2194101404a324eed72aaf  plate_ocr.tflite
+6f4673eda971373a0e65a26fce951d9cd94c2ce4b3d7647551a61022cee53f34  plate_ocr.tflite
+0335c74a305173bb6f393efed0fde03cadeaa0b649ed8e19f431016d8232d0a6  plate_config.yaml
 ```
 
 Si se reentrena o se vuelve a exportar un modelo, estos valores cambian: hay que actualizar la tabla (ver sección 12).
@@ -217,6 +218,13 @@ Salida del detector: lista de `{ box: [x0, y0, x1, y1] en píxeles (float), scor
 
 Para cada caja `[x0, y0, x1, y1]`:
 
+0. **Solo en la app (fast-plate-ocr), no en la referencia de Python:** agrandar la caja alrededor de su centro hasta
+   la proporción ancho / alto `CROP_ASPECT_RATIO = 2.0`, sin reducirla nunca. Si `ancho < alto × 2`, se añade
+   `(alto × 2 − ancho) / 2` a cada lado; si no, se añade `(ancho / 2 − alto) / 2` arriba y abajo. Así, cuando el
+   detector deja fuera los caracteres de los lados de la placa, el recorte sigue cubriendo la placa entera. 2.0 es la
+   entrada de fast-plate-ocr (128×64) y está cerca de la mediana de sus recortes de entrenamiento (1,94, placa de
+   33×17 cm). Ejemplo: caja de 60×40 → 80×40. Los pasos siguientes usan la caja agrandada
+   (`PipelineParams.cropAspectRatio`; `null` lo desactiva).
 1. `padX = (x1 − x0) × 0.08` y `padY = (y1 − y0) × 0.15`.
 2. Rectángulo de recorte:
    `left = max(0, floor(x0 − padX))`, `top = max(0, floor(y0 − padY))`,
@@ -342,6 +350,7 @@ Parámetros de referencia, que conviene tener en un único sitio configurable:
 | Parámetro | Valor | Dónde se usa |
 |---|---|---|
 | `DET_THRESHOLD` | 0.4 | Confianza mínima de una placa (4.4) |
+| `CROP_ASPECT_RATIO` | 2.0 (app); sin agrandar (referencia) | Proporción a la que se agranda la caja antes del margen (4.5, paso 0) |
 | `CROP_PADDING` | 0.08 (horizontal), 0.15 (vertical) | Margen del recorte (4.5) |
 | `MIN_OCR_WIDTH` | 60 px | Ancho mínimo del recorte para leerlo (4.5) |
 | Tamaño detector | 576×576 | `preprocessor_config.json` |
@@ -447,7 +456,8 @@ Y comprobar el orden NCHW: en una imagen 2×1 con el píxel izquierdo rojo y el 
 
 Imagen de 1000×500 px, un candidato con `logit = 0` y caja `(cx, cy, w, h) = (0.5, 0.5, 0.2, 0.1)`:
 `score = 0.5`, caja en píxeles `[400, 225, 600, 275]`. Con recorte: `padX = 16`, `padY = 7.5` →
-rectángulo `[384, 217, 616, 283]` (ancho 232 → legible).
+rectángulo `[384, 217, 616, 283]` (ancho 232 → legible). Con el paso 0 de la app (caja agrandada a 200×100):
+`[384, 185, 616, 315]`.
 
 ### 10.3 Vocabulario (unitaria)
 

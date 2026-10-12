@@ -39,7 +39,8 @@ class FastPlateOcrReferenceTest {
             val rgb = loadImage(image)
             val result = pipeline.run(rgb)
             for (plate in result.plates.filter { it.readable }) {
-                val crop = rgb.crop(plateCropRect(plate.box, rgb.width, rgb.height, PipelineParams()))
+                // TrOCR gets the crop of its reference (square input, detector box as is).
+                val crop = rgb.crop(plateCropRect(plate.box, rgb.width, rgb.height, PipelineParams(cropAspectRatio = null)))
                 val trocr = trocrReader.read(crop)
                 val expected = GROUND_TRUTH[image].takeIf { plate === result.plates.first() }
                 if (expected != null && plate.text == expected) fastHits++

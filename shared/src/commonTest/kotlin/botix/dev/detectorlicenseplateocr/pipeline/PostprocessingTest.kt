@@ -16,9 +16,33 @@ class PostprocessingTest {
         val box = detections[0].box
         assertEquals(listOf(400f, 225f, 600f, 275f), listOf(box.x0, box.y0, box.x1, box.y1))
 
-        val crop = plateCropRect(box, 1000, 500, PipelineParams())
+        val crop = plateCropRect(box, 1000, 500, PipelineParams(cropAspectRatio = null))
         assertEquals(PixelRect(384, 217, 616, 283), crop)
         assertEquals(232, crop.width)
+    }
+
+    @Test
+    fun wideBoxGrowsInHeightToThePlateAspectRatio() {
+        // Same 200x50 box (4:1): grown to 200x100 around its center, then padX = 16, padY = 15.
+        val crop = plateCropRect(Box(400f, 225f, 600f, 275f), 1000, 500, PipelineParams())
+        assertEquals(PixelRect(384, 185, 616, 315), crop)
+    }
+
+    @Test
+    fun narrowBoxGrowsInWidthToThePlateAspectRatio() {
+        // 60x40 box (1.5:1), e.g. the detector left out the characters at the sides: grown to 80x40, then
+        // padX = 6.4, padY = 6.
+        val crop = plateCropRect(Box(100f, 100f, 160f, 140f), 1000, 1000, PipelineParams())
+        assertEquals(PixelRect(83, 94, 177, 146), crop)
+    }
+
+    @Test
+    fun boxAlreadyAtThePlateAspectRatioIsNotGrown() {
+        val box = Box(100f, 100f, 200f, 150f)
+        assertEquals(
+            plateCropRect(box, 1000, 1000, PipelineParams(cropAspectRatio = null)),
+            plateCropRect(box, 1000, 1000, PipelineParams()),
+        )
     }
 
     @Test

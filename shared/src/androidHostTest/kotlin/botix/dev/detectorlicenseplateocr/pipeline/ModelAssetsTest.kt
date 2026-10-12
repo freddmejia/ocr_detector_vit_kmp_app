@@ -5,7 +5,7 @@ import java.security.MessageDigest
 import kotlin.test.Test
 import kotlin.test.assertEquals
 
-/** Checks the JSON files actually bundled in assets (Pipeline.md 2.1, 2.4 and 10.3). No device needed. */
+/** Checks the config files actually bundled in assets (Pipeline.md 2.1, 2.4 and 10.3). No device needed. */
 class ModelAssetsTest {
     private val assets = File("src/androidMain/assets")
 
@@ -52,7 +52,8 @@ class ModelAssetsTest {
             ModelFiles.OCR_MODEL to "da7499dbdc1855c8bdf48547cfc79912db9cd7db592dae9dfca52aa62403bc6e",
             ModelFiles.OCR_CONFIG to "868f79f992a3f1591ecad72550826bf2660d2417bd266e11ef34da1ecacef60e",
             ModelFiles.OCR_VOCABULARY to "e587ea3e69db8e5d3f2155dea57e50a64d58b146f358c9a06dc19f160fbd272d",
-            ModelFiles.FAST_OCR_MODEL to "ac6a129b8f2a5ba379f8b126c96fcd7c69428fdb8c2194101404a324eed72aaf",
+            ModelFiles.FAST_OCR_MODEL to "6f4673eda971373a0e65a26fce951d9cd94c2ce4b3d7647551a61022cee53f34",
+            ModelFiles.FAST_OCR_CONFIG to "0335c74a305173bb6f393efed0fde03cadeaa0b649ed8e19f431016d8232d0a6",
         ).forEach { (path, expected) -> assertEquals(expected, sha256(File(assets, path)), path) }
     }
 

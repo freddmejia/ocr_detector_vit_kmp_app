@@ -132,7 +132,7 @@ fun createPlateTextReader(
     }
     OcrEngine.FAST_PLATE_OCR -> {
         val config = FastOcrConfig.parse(assets.text(ModelFiles.FAST_OCR_CONFIG))
-        // 1.6 MB model: XNNPACK's copy of the weights is negligible.
+        // ~0.9 MB model: XNNPACK's copy of the weights is negligible.
         val model = AndroidTfliteModel.fromAsset(assets, ModelFiles.FAST_OCR_MODEL, threads)
         try {
             FastPlateOcr(model, config)
