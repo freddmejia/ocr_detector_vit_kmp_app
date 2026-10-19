@@ -37,6 +37,16 @@ flowchart LR
 
 The whole pipeline is shared Kotlin code; each platform only provides the TensorFlow Lite runtime and the camera.
 
+## Training
+
+Both models are fine-tuned in [**ocr_detector_vit**](https://github.com/freddmejia/ocr_detector_vit) and exported
+to TensorFlow Lite with Jupyter notebooks:
+
+| Model | Notebook | Fine-tuning |
+|---|---|---|
+| Detector | [`RFDETR_License_Plates.ipynb`](https://github.com/freddmejia/ocr_detector_vit/blob/main/notebooks/RFDETR_License_Plates.ipynb) | `Roboflow/rf-detr-nano` with Hugging Face Transformers on [justjuu/license-plate-detection](https://huggingface.co/datasets/justjuu/license-plate-detection), one class: `license_plate` |
+| OCR | [`FastPlateOCR_Placas.ipynb`](https://github.com/freddmejia/ocr_detector_vit/blob/main/notebooks/FastPlateOCR_Placas.ipynb) | `cct_xs_v2_global` from [fast-plate-ocr](https://github.com/ankandrew/fast-plate-ocr) on Colombian plates ([jdbravo/plates-ocr-train](https://gitlab.com/jdbravo/plates-ocr-train)) |
+
 ## Stack
 
 **Kotlin Multiplatform** · **TensorFlow Lite** · **AVFoundation**
@@ -56,7 +66,7 @@ git clone https://github.com/freddmejia/ocr_detector_vit_kmp_app.git
     <td>Open the project in Android Studio, plug in your phone and press Run.<br><br>
       <img src="docs/media/run-android-studio.png" width="260" alt="Android Studio: androidApp, Run"></td>
     <td>Open <code>iosApp/iosApp.xcodeproj</code> in Xcode, pick your Team and your iPhone, press Run.<br><br>
-      <img src="docs/media/run-xcode.png" width="260" alt="Xcode: iosApp, iPhone, Run"></td>
+      <img src="docs/media/run-xcode.png" width="184" alt="Xcode: Run"></td>
   </tr>
 </table>
 
