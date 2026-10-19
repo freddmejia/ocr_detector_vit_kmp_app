@@ -1,31 +1,69 @@
-This is a Kotlin Multiplatform project targeting Android, iOS.
+# Plate Scanner: on-device license plate reading for Android & iOS
 
-* [/iosApp](./iosApp/iosApp) contains an iOS application. Even if you’re sharing your UI with Compose Multiplatform,
-  you need this entry point for your iOS app. This is also where you should add SwiftUI code for your project.
+Point the camera at a car and read its plate in real time, **100 % on the device**: no server, no cloud API, no
+network. Two neural networks, one Kotlin Multiplatform codebase, the same `.tflite` files on both platforms.
 
-* [/shared](./shared/src) is for code that will be shared across your Compose Multiplatform applications.
-  It contains several subfolders:
-  - [commonMain](./shared/src/commonMain/kotlin) is for code that’s common for all targets.
-  - Other folders are for Kotlin code that will be compiled for only the platform indicated in the folder name.
-    For example, if you want to use Apple’s CoreCrypto for the iOS part of your Kotlin app,
-    the [iosMain](./shared/src/iosMain/kotlin) folder would be the right place for such calls.
-    Similarly, if you want to edit the Desktop (JVM) specific part, the [jvmMain](./shared/src/jvmMain/kotlin)
-    folder is the appropriate location.
+![Kotlin Multiplatform](https://img.shields.io/badge/Kotlin_Multiplatform-7F52FF?logo=kotlin&logoColor=white)
+![TensorFlow Lite](https://img.shields.io/badge/TensorFlow_Lite-FF6F00?logo=tensorflow&logoColor=white)
+![Android](https://img.shields.io/badge/Android-3DDC84?logo=android&logoColor=white)
+![iOS](https://img.shields.io/badge/iOS-000000?logo=apple&logoColor=white)
 
-### Running the apps
+<table>
+  <tr>
+    <td align="center"><img src="docs/media/01-launch.gif" width="220" alt="App launch"><br><sub>Launch: models load on device</sub></td>
+    <td align="center"><img src="docs/media/02-detect.gif" width="220" alt="Plate detection"><br><sub>Detect: plate found inside the guide</sub></td>
+    <td align="center"><img src="docs/media/03-read.gif" width="220" alt="Plate reading"><br><sub>Read: text + confidence + history</sub></td>
+  </tr>
+</table>
 
-Use the run configurations provided by the run widget in your IDE's toolbar. You can also use these commands and options:
+## Pipeline
 
-- Android app: `./gradlew :androidApp:assembleDebug`
-- iOS app: open the [/iosApp](./iosApp) directory in Xcode and run it from there.
+```mermaid
+flowchart LR
+    A[Camera frame] --> B[Guide crop]
+    B --> C[RF-DETR Nano<br/>plate detector]
+    C --> D[Box grown to 2:1<br/>+ padding]
+    D --> E[fast-plate-ocr<br/>CCT-XS]
+    E --> F[Plate text<br/>+ confidence]
+```
 
-### Running tests
+1. **Camera.** Each frame is cropped to the guide rectangle on screen, at full resolution.
+2. **Detector: RF-DETR Nano.** A transformer detector fine-tuned on one class, `license_plate`. It takes the crop at
+   384×384 and returns the plate's box and a detection confidence.
+3. **Crop.** The box is grown around its center to the 2:1 shape of a plate, plus a small margin, so characters at
+   the sides that the detector left out are still in the crop.
+4. **OCR: fast-plate-ocr CCT-XS.** A compact convolutional transformer fine-tuned on Colombian plates. It takes the
+   plate at 64×128 and predicts its 10 character slots in a single pass, with a confidence per character.
 
-Use the run button in your IDE's editor gutter, or run tests using Gradle tasks:
+The whole pipeline is shared Kotlin code; each platform only provides the TensorFlow Lite runtime and the camera.
 
-- Android tests: `./gradlew :shared:testAndroidHostTest`
-- iOS tests: `./gradlew :shared:iosSimulatorArm64Test`
+## Stack
 
----
+**Kotlin Multiplatform** · **TensorFlow Lite** · **AVFoundation**
 
-Learn more about [Kotlin Multiplatform](https://www.jetbrains.com/help/kotlin-multiplatform-dev/get-started.html)…
+## Try it on your phone
+
+```bash
+git clone https://github.com/freddmejia/ocr_detector_vit_kmp_app.git
+```
+
+<table>
+  <tr>
+    <th>Android</th>
+    <th>iOS</th>
+  </tr>
+  <tr>
+    <td>Open the project in Android Studio, plug in your phone and press Run.<br><br>
+      <img src="docs/media/run-android-studio.png" width="260" alt="Android Studio: androidApp, Run"></td>
+    <td>Open <code>iosApp/iosApp.xcodeproj</code> in Xcode, pick your Team and your iPhone, press Run.<br><br>
+      <img src="docs/media/run-xcode.png" width="260" alt="Xcode: iosApp, iPhone, Run"></td>
+  </tr>
+</table>
+
+## Docs
+
+| | |
+|---|---|
+| [Pipeline.md](shared/agents/Pipeline.md) | Model contract: tensors, preprocessing, cropping, decoding, validation tables |
+| [Baseline.md](shared/agents/Baseline.md) | How a `.tflite` runs from a KMP module on Android and iOS |
+| [Traceability.md](shared/agents/Traceability.md) | What was built, where, and how it was verified |
