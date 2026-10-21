@@ -10,11 +10,14 @@ network. Two neural networks, one Kotlin Multiplatform codebase, the same `.tfli
 
 <table>
   <tr>
-    <td align="center"><img src="docs/media/01-launch.gif" width="220" alt="App launch"><br><sub>Launch: models load on device</sub></td>
-    <td align="center"><img src="docs/media/02-detect.gif" width="220" alt="Plate detection"><br><sub>Detect: plate found inside the guide</sub></td>
-    <td align="center"><img src="docs/media/03-read.gif" width="220" alt="Plate reading"><br><sub>Read: text + confidence + history</sub></td>
+    <td align="center"><img src="docs/media/01-ready.jpg" width="220" alt="Ready to scan"><br><sub>Ready: models loaded on device</sub></td>
+    <td align="center"><img src="docs/media/02-detect.jpg" width="220" alt="Plate detection"><br><sub>Detect: plate box inside the guide</sub></td>
+    <td align="center"><img src="docs/media/03-read.jpg" width="220" alt="Plate reading"><br><sub>Read: text + confidence + history</sub></td>
   </tr>
 </table>
+
+<sub>Running on an iPhone. The plate photos on screen are from
+<a href="https://www.olavsplates.com/spain.html">Olav's License Plates (Spain)</a>.</sub>
 
 ## Pipeline
 
